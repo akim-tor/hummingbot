@@ -212,7 +212,7 @@ cdef class PortHedgeStrategy(StrategyBase):
             port_corr = sum(port_corr.values())
 
             # use the correlation as the hedge ratio set the proper hedge amount
-            hedge_amount = -(total * port_corr + taker_balance)
+            hedge_amount = -(total * port_corr * self._hedge_ratio + taker_balance)
 
             #hedge_amount = -(maker_balance*self._hedge_ratio + taker_balance)
             is_buy = hedge_amount > 0
