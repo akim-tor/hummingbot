@@ -332,6 +332,9 @@ class KucoinExchange(ExchangePyBase):
     async def _update_trading_fees(self):
         trading_symbols = [await self.exchange_symbol_associated_to_pair(trading_pair=trading_pair)
                            for trading_pair in self._trading_pairs]
+        # EK added if condition for empty trading symbol arrays
+        if (len(trading_symbols) == 0):
+            return
         params = {"symbols": ",".join(trading_symbols)}
         resp = await self._api_get(
             path_url=CONSTANTS.FEE_PATH_URL,
