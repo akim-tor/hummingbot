@@ -71,6 +71,7 @@ cdef class PortHedgeStrategy(StrategyBase):
 
         self._weights = {}
         self._port_corr = 0
+        self._total = 0
 
     @property
     def market_info_to_active_orders(self) -> Dict[MarketTradingPairTuple, List[LimitOrder]]:
@@ -212,9 +213,23 @@ cdef class PortHedgeStrategy(StrategyBase):
             port_corr = sum(port_corr.values())
             self._weights = weights
             self._port_corr = port_corr
+            self._total = total
 
             # use the correlation as the hedge ratio set the proper hedge amount
             hedge_amount = -(total * port_corr * self._hedge_ratio + taker_balance)
+
+            """
+            print("Mkr asset:" + str(maker_asset) + "\n" + 
+                  "Maker Bal:" + str(maker_balance) + "\n" + 
+                  "Mkt Pair:" + str(market_pair) + "\n" + 
+                  "Trd Pair:" + str(trading_pair) + "\n" +
+                  "Tkr Bal:" + str(taker_balance) + "\n" + 
+                  "hdg Amt:" + str(hedge_amount) + "\n" +
+                  "Port Cor:" + str(port_corr) + "\n" +
+                  "Hg Ratio:" + str(self._hedge_ratio) + "\n" +
+                  "total:" + str(total))
+            """
+
 
             #hedge_amount = -(maker_balance*self._hedge_ratio + taker_balance)
             is_buy = hedge_amount > 0
@@ -256,7 +271,7 @@ cdef class PortHedgeStrategy(StrategyBase):
                 price = rate_instance.rate(maker_asset + "-USDT")
                 if price == None:
                     price = Decimal(0)
-                print(str(maker_asset) + "/" + str(price))
+                #print(str(maker_asset) + "/" + str(price))
                 prices[maker_asset] = price
                 balances[maker_asset] = balance
                 total = total + (balance * price)
@@ -283,9 +298,9 @@ cdef class PortHedgeStrategy(StrategyBase):
             data.append([
                 maker_asset,
                 mid_price,
-                maker_balance,
-                taker_balance,
-                difference,
+                Decimal(maker_balance).quantize(Decimal('0.0001')),
+                Decimal(taker_balance).quantize(Decimal('0.0001')),
+                Decimal(difference).quantize(Decimal('0.0001')),
                 hedge_ratio,
             ])
         return pd.DataFrame(data=data, columns=columns)
@@ -348,7 +363,8 @@ cdef class PortHedgeStrategy(StrategyBase):
         weights_df = self.portfolio_df()
         lines.extend(["", "  Portfolio Weights:"] + ["    " + line for line in weights_df.to_string(index=False).split("\n")])
 
-        lines.extend(["", "Portfolio Corr:" + str(self._port_corr)])
+        lines.extend(["", "Portfolio Corr:" + str(Decimal(self._port_corr).quantize(Decimal('.0001')))])
+        lines.extend(["", "Portfolio Total:" + str(Decimal(self._total).quantize(Decimal('.0001')))])
 
         return "\n".join(lines)
 
