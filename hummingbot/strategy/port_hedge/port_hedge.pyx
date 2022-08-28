@@ -69,6 +69,9 @@ cdef class PortHedgeStrategy(StrategyBase):
         self._slippage = slippage
         self._max_order_age = max_order_age
 
+        self._weights = {}
+        self._port_corr = 0
+
     @property
     def market_info_to_active_orders(self) -> Dict[MarketTradingPairTuple, List[LimitOrder]]:
         return self._sb_order_tracker.market_pair_to_active_orders
@@ -161,8 +164,6 @@ cdef class PortHedgeStrategy(StrategyBase):
             object quantized_order_amount = market.c_quantize_order_amount(trading_pair, Decimal(amount))
         price = Decimal(price)
         price = price*(Decimal(1) + Decimal(self._slippage)) if is_buy else price*(Decimal(1) - Decimal(self._slippage))
-        """
-        print("test that shouldn't be here")
         if quantized_order_amount*price>self._minimum_trade:
             if is_buy:
                 order_id = self.c_buy_with_specific_market(market_pair, quantized_order_amount,
@@ -172,7 +173,6 @@ cdef class PortHedgeStrategy(StrategyBase):
                                                             order_type=OrderType.LIMIT, price=price, expiration_seconds=NaN)
             self.log_with_clock(logging.INFO,
                                 f"Place {'Buy' if is_buy else 'Sell'} {quantized_order_amount} {trading_pair}")
-        """
 
     def market_status_data_frame(self) -> pd.DataFrame:
         markets_data = []
@@ -210,6 +210,8 @@ cdef class PortHedgeStrategy(StrategyBase):
             weights, total = self.calculate_weights()
             port_corr = {item[0]: item[1] * self._corr[idx] for idx, item in enumerate(weights.items())}
             port_corr = sum(port_corr.values())
+            self._weights = weights
+            self._port_corr = port_corr
 
             # use the correlation as the hedge ratio set the proper hedge amount
             hedge_amount = -(total * port_corr * self._hedge_ratio + taker_balance)
@@ -247,11 +249,14 @@ cdef class PortHedgeStrategy(StrategyBase):
         # get the balance and price of current holdings
         data = self._exchanges.maker.get_all_balances()
         rate_instance = RateOracle.get_instance()
+
         for maker_asset, balance in data.items():
             if maker_asset in holdings_list:
-                price = self._exchanges.maker.get_mid_price(maker_asset + "-USDT")
-                #price = rate_instance.rate(maker_asset + "-USDT")
-                #print(str(maker_asset) + "/" + str(price))
+                #price = self._exchanges.maker.get_mid_price(maker_asset + "-USDT")
+                price = rate_instance.rate(maker_asset + "-USDT")
+                if price == None:
+                    price = Decimal(0)
+                print(str(maker_asset) + "/" + str(price))
                 prices[maker_asset] = price
                 balances[maker_asset] = balance
                 total = total + (balance * price)
@@ -304,6 +309,19 @@ cdef class PortHedgeStrategy(StrategyBase):
                 ])
         return pd.DataFrame(data=data, columns=columns)
 
+    def portfolio_df(self) -> pd.DataFrame:
+        columns = ["Market", "Weight", "Corr"]
+        data=[]
+
+        for idx, (ticker, wgt) in enumerate(self._weights.items()):
+            data.append([
+                ticker,
+                Decimal(wgt).quantize(Decimal('.01')),
+                Decimal(self._corr[idx]).quantize(Decimal('.01'))
+            ])
+
+        return pd.DataFrame(data=data, columns=columns)
+
     def format_status(self) -> str:
         lines = []
         if not self._all_markets_ready:
@@ -325,6 +343,12 @@ cdef class PortHedgeStrategy(StrategyBase):
             lines.extend(["", "  Active Orders:"] + ["    " + line for line in df.to_string(index=False).split("\n")])
         else:
             lines.extend(["", "  No active orders."])
+
+        # EK: list out current portfolio
+        weights_df = self.portfolio_df()
+        lines.extend(["", "  Portfolio Weights:"] + ["    " + line for line in weights_df.to_string(index=False).split("\n")])
+
+        lines.extend(["", "Portfolio Corr:" + str(self._port_corr)])
 
         return "\n".join(lines)
 

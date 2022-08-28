@@ -22,7 +22,7 @@ def start(self):
     minimum_trade = c_map.get("minimum_trade").value
     hedge_interval = c_map.get("hedge_interval").value
     # cleared out the maker_assets below because we are using the oracle
-    self._initialize_markets([(maker_exchange, maker_assets), (taker_exchange, taker_markets)])
+    self._initialize_markets([(maker_exchange, []), (taker_exchange, taker_markets)])
     exchanges = ExchangePairTuple(maker=self.markets[maker_exchange], taker=self.markets[taker_exchange])
 
     market_infos = {}

@@ -22,6 +22,8 @@ cdef class PortHedgeStrategy(StrategyBase):
         float _hedge_interval
         object _slippage
         object _max_order_age
+        object _weights
+        float _port_corr
 
     cdef object check_and_hedge_asset(self,
                                       str maker_asset,
