@@ -194,6 +194,9 @@ cdef class PortHedgeStrategy(StrategyBase):
 
     def update_wallet(self):
         position_updated=False
+        # EK added
+        rate_instance = RateOracle.get_instance()
+
         for maker_asset in self._market_infos:
             market_pair = self._market_infos[maker_asset]
             trading_pair=market_pair.trading_pair
@@ -215,8 +218,9 @@ cdef class PortHedgeStrategy(StrategyBase):
             self._port_corr = port_corr
             self._total = total
 
-            # use the correlation as the hedge ratio set the proper hedge amount
-            hedge_amount = -(total * port_corr * self._hedge_ratio + taker_balance)
+            # use the correlation as the hedge ratio set the proper hedge amount, in the maker asset units
+            price = rate_instance.rate(maker_asset + "-USDT")
+            hedge_amount = -((total/price) * port_corr * self._hedge_ratio + (taker_balance * price))
 
             """
             print("Mkr asset:" + str(maker_asset) + "\n" + 
@@ -234,9 +238,6 @@ cdef class PortHedgeStrategy(StrategyBase):
             #hedge_amount = -(maker_balance*self._hedge_ratio + taker_balance)
             is_buy = hedge_amount > 0
             price = market_pair.get_price(is_buy)
-
-            # hedge amount needs to be adjusted by the price of the hedging asset to get the proper amount of units
-            hedge_amount = hedge_amount / price
 
             self.check_and_cancel_active_orders(market_pair, hedge_amount)
             if market_pair not in self.market_info_to_active_orders:
