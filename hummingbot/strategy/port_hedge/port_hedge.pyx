@@ -220,7 +220,7 @@ cdef class PortHedgeStrategy(StrategyBase):
 
             # use the correlation as the hedge ratio set the proper hedge amount, in the maker asset units
             price = rate_instance.rate(maker_asset + "-USDT")
-            hedge_amount = -((total/price) * port_corr * self._hedge_ratio + (taker_balance * price))
+            hedge_amount = -((total/price) * port_corr * self._hedge_ratio + taker_balance)
 
             """
             print("Mkr asset:" + str(maker_asset) + "\n" + 
