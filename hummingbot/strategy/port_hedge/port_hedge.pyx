@@ -234,6 +234,10 @@ cdef class PortHedgeStrategy(StrategyBase):
             #hedge_amount = -(maker_balance*self._hedge_ratio + taker_balance)
             is_buy = hedge_amount > 0
             price = market_pair.get_price(is_buy)
+
+            # hedge amount needs to be adjusted by the price of the hedging asset to get the proper amount of units
+            hedge_amount = hedge_amount / price
+
             self.check_and_cancel_active_orders(market_pair, hedge_amount)
             if market_pair not in self.market_info_to_active_orders:
                 self.check_and_hedge_asset(maker_asset,
